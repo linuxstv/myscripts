@@ -3,6 +3,14 @@ import tkinter as tk
 from tkinter import messagebox
 import threading
 
+# Define the default folder path
+default_folder_path = "~/Downloads"  # Change this to your preferred path
+
+# Ensure the folder exists
+import tkinter.filedialog as fd
+import os
+os.makedirs(default_folder_path, exist_ok=True)
+
 # Check if yt-dlp is installed
 def check_yt_dlp():
 	try:
@@ -24,6 +32,7 @@ def fetch_formats(video_url):
 # Download the video with real-time progress
 def download_video(video_url, video_format, audio_format, status_box, stop_button):
 	def download():
+		global default_folder_path  # Use the updated global folder path
 		try:
 			# Prepare the format string
 			format_string = video_format
@@ -31,11 +40,12 @@ def download_video(video_url, video_format, audio_format, status_box, stop_butto
 				format_string += f"+{audio_format}"
 
 			# Running yt-dlp with a custom progress handler using the --progress option
+			output_template = os.path.join(default_folder_path, "%(title)s.%(ext)s")  # Include folder path
 			process = subprocess.Popen(
 				[
 					"yt-dlp",
 					"-f", f"{format_string}",
-					"-o", "%(title)s.%(ext)s",
+					"-o", output_template,
 					"--progress",
 					video_url
 				],
@@ -86,6 +96,16 @@ def main():
 	if not check_yt_dlp():
 		return
 
+	# Default folder path
+	default_folder_path = os.path.expanduser("~/Downloads")
+	 
+	def browse_folder():
+		global default_folder_path  # Make it global
+		selected_folder = fd.askdirectory(initialdir=default_folder_path, title="Select Download Folder")
+		if selected_folder:  # Update only if a folder is selected
+			default_folder_path = selected_folder
+			folder_label.config(text=f"Download Folder: {default_folder_path}")
+
 	root = tk.Tk()
 	root.title("YT-DLP Video Downloader")
 	root.geometry("800x600")  # Set an initial size
@@ -93,20 +113,36 @@ def main():
 
 	main_frame = tk.Frame(root)
 	main_frame.pack(fill="both", expand=True)
+	
+	# Parent Frame for URL and Folder
+	top_frame = tk.Frame(main_frame)
+	top_frame.pack(fill="x", padx=10, pady=5)
 
 	# URL Input Frame
-	url_frame = tk.Frame(main_frame)
-	url_frame.pack(fill="x", padx=10, pady=5)
+	url_frame = tk.Frame(top_frame)
+	url_frame.grid(row=0, column=0, sticky="ew", padx=5)
 
 	tk.Label(url_frame, text="Video URL:").grid(row=0, column=0, sticky="w", padx=5)
-
 	url_entry = tk.Entry(url_frame)
 	url_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-
 	fetch_button = tk.Button(url_frame, text="Fetch Formats", command=lambda: on_fetch_formats(url_entry.get()))
 	fetch_button.grid(row=0, column=2, padx=5, pady=5)
-	
+
+	# Ensure URL entry expands
 	url_frame.grid_columnconfigure(1, weight=1)
+
+	# Folder Selection Frame
+	folder_frame = tk.Frame(top_frame)
+	folder_frame.grid(row=0, column=1, sticky="e", padx=5)
+
+	folder_label = tk.Label(folder_frame, text=f"Download Folder: {default_folder_path}")
+	folder_label.grid(row=0, column=0, sticky="w", padx=5)
+	browse_button = tk.Button(folder_frame, text="Browse", command=browse_folder)
+	browse_button.grid(row=0, column=1, padx=5)
+
+	# Configure column expansion for top_frame
+	top_frame.grid_columnconfigure(0, weight=1)  # Allow URL section to expand
+	top_frame.grid_columnconfigure(1, weight=0)  # Prevent folder frame from stretching
 
 	# Create context menu for right-click
 	def on_right_click(event):
