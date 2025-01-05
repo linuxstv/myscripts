@@ -76,7 +76,7 @@ def main():
 		return
 
 	root = tk.Tk()
-	root.title("YouTube Video Downloader")
+	root.title("YT-DLP Video Downloader")
 	root.geometry("800x600")  # Set an initial size
 	root.attributes("-zoomed", True)  # Maximize the window
 
@@ -87,7 +87,7 @@ def main():
 	url_frame = tk.Frame(main_frame)
 	url_frame.pack(fill="x", padx=10, pady=5)
 
-	tk.Label(url_frame, text="YouTube video URL:").grid(row=0, column=0, sticky="w", padx=5)
+	tk.Label(url_frame, text="Video URL:").grid(row=0, column=0, sticky="w", padx=5)
 
 	url_entry = tk.Entry(url_frame)
 	url_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
@@ -169,7 +169,7 @@ def main():
 		audio_formats_listbox.delete(0, "end")  # Clear previous audio formats
 
 		if not video_url:
-			messagebox.showerror("Error", "Please enter a YouTube video URL.")
+			messagebox.showerror("Error", "Please enter a video URL.")
 			return
 
 		formats = fetch_formats(video_url)
