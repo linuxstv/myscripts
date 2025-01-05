@@ -3,12 +3,9 @@ import tkinter as tk
 from tkinter import messagebox
 import threading
 
-# Define the default folder path
-default_folder_path = "~/Downloads"  # Change this to your preferred path
-
-# Ensure the folder exists
 import tkinter.filedialog as fd
 import os
+default_folder_path = os.getcwd()
 
 # Check if yt-dlp is installed
 def check_yt_dlp():
@@ -102,8 +99,20 @@ def main():
 		global default_folder_path  # Make it global
 		selected_folder = fd.askdirectory(initialdir=default_folder_path, title="Select Download Folder")
 		if selected_folder:  # Update only if a folder is selected
-			default_folder_path = selected_folder
-			folder_label.config(text=f"Download Folder: {default_folder_path}")
+			default_folder_path = selected_folder.rstrip("/")  # Remove trailing '/'
+			folder_entry.delete(0, "end")  # Clear the entry box
+			folder_entry.insert(0, default_folder_path)  # Update with the selected folder
+
+	def update_default_folder_path(event=None):
+		global default_folder_path
+		new_folder_path = folder_entry.get().rstrip("/")  # Remove trailing '/'
+		if os.path.isdir(new_folder_path):
+			default_folder_path = new_folder_path
+			folder_entry.delete(0, tk.END)
+			folder_entry.insert(0, default_folder_path)  # Update entry without trailing '/'
+			print(f"Updated default folder path to: {default_folder_path}")
+		else:
+			print("Invalid folder path entered.")
 
 	root = tk.Tk()
 	root.title("YT-DLP Video Downloader")
@@ -134,8 +143,13 @@ def main():
 	folder_frame = tk.Frame(top_frame)
 	folder_frame.grid(row=0, column=1, sticky="e", padx=5)
 
-	folder_label = tk.Label(folder_frame, text=f"Download Folder: {default_folder_path}")
-	folder_label.grid(row=0, column=0, sticky="w", padx=5)
+	folder_entry = tk.Entry(folder_frame, width=50)  # Entry widget for folder path
+	folder_entry.insert(0, default_folder_path)  # Set the default folder path
+	folder_entry.grid(row=0, column=0, padx=5, pady=5, sticky="w")
+	# Add event listeners for focus out or key release
+	folder_entry.bind("<FocusOut>", update_default_folder_path)
+	folder_entry.bind("<KeyRelease>", update_default_folder_path)
+
 	browse_button = tk.Button(folder_frame, text="Browse", command=browse_folder)
 	browse_button.grid(row=0, column=1, padx=5)
 
@@ -157,19 +171,63 @@ def main():
 		url_entry.delete(0, 'end')
 
 	def paste_url():
-		url_entry.insert('insert', root.clipboard_get())
+		try:
+			url_entry.delete("sel.first", "sel.last")
+		except tk.TclError:
+			pass
+		url_entry.event_generate("<<Paste>>")
 
 	def select_all_url():
-		url_entry.select_range(0, 'end')
+		url_entry.select_range(0, tk.END)
+		url_entry.icursor(tk.END)
+	
+	def show_context_menu(event):
+		"""Display the right-click context menu at the cursor's location."""
+		context_menu_fe.post(event.x_root, event.y_root)
 
+	def copy_text():
+		folder_entry.event_generate("<<Copy>>")
+
+	def cut_text():
+		folder_entry.event_generate("<<Cut>>")
+
+	def paste_text():
+		try:
+			# Delete selected text and paste clipboard content
+			folder_entry.delete("sel.first", "sel.last")
+		except tk.TclError:
+			# No text selected, just insert clipboard content
+			pass
+		folder_entry.event_generate("<<Paste>>")
+
+	def select_all_text():
+		folder_entry.select_range(0, tk.END)
+		folder_entry.icursor(tk.END)  # Move cursor to the end of the selection
+
+	def hide_context_menu(event=None):
+		"""Hide the context menu."""
+		context_menu.unpost()
+		context_menu_fe.unpost()
+
+	# Create a context menu for the url_entry
 	context_menu = tk.Menu(root, tearoff=0)
 	context_menu.add_command(label="Cut", command=cut_url)
 	context_menu.add_command(label="Copy", command=copy_url)
 	context_menu.add_command(label="Paste", command=paste_url)
 	context_menu.add_command(label="Select All", command=select_all_url)
+	# Create a context menu for the folder_entry
+	context_menu_fe = tk.Menu(root, tearoff=0)
+	context_menu_fe.add_command(label="Cut", command=cut_text)
+	context_menu_fe.add_command(label="Copy", command=copy_text)
+	context_menu_fe.add_command(label="Paste", command=paste_text)
+	context_menu_fe.add_command(label="Select All", command=select_all_text)
 
 	# Bind right-click event on URL input box
 	url_entry.bind("<Button-3>", on_right_click)
+	# Bind right-click to show the context menu
+	folder_entry.bind("<Button-3>", show_context_menu)  # Button-3 is the right mouse button
+	# Bind global click to hide the context menu
+	root.bind("<Button-1>", hide_context_menu)  # Button-1 is the left mouse button
 
 	# Input Options Frame (Grid 1)
 	input_options_frame = tk.Frame(main_frame)
