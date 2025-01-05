@@ -9,7 +9,6 @@ default_folder_path = "~/Downloads"  # Change this to your preferred path
 # Ensure the folder exists
 import tkinter.filedialog as fd
 import os
-os.makedirs(default_folder_path, exist_ok=True)
 
 # Check if yt-dlp is installed
 def check_yt_dlp():
