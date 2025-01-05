@@ -22,7 +22,7 @@ def fetch_formats(video_url):
 		return None
 
 # Download the video with real-time progress
-def download_video(video_url, video_format, audio_format, status_box):
+def download_video(video_url, video_format, audio_format, status_box, stop_button):
 	def download():
 		try:
 			# Prepare the format string
@@ -41,6 +41,9 @@ def download_video(video_url, video_format, audio_format, status_box):
 				],
 				stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
 			)
+
+			# Store the process for termination later
+			stop_button.process = process
 
 			# Continuously read the output
 			for line in process.stdout:
@@ -69,6 +72,14 @@ def download_video(video_url, video_format, audio_format, status_box):
 	# Run the download in a separate thread to avoid freezing the GUI
 	download_thread = threading.Thread(target=download)
 	download_thread.start()
+
+# Stop the download
+def stop_download(stop_button, status_box):
+	if hasattr(stop_button, "process"):
+		stop_button.process.terminate()
+		status_box.config(state="normal")
+		status_box.insert("end", "Download stopped.\n")
+		status_box.config(state="disabled")
 
 # Main application
 def main():
@@ -135,12 +146,27 @@ def main():
 	tk.Label(video_audio_grid, text="Video code (e.g., 136 for 720p):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
 	video_format_entry = tk.Entry(video_audio_grid)
 	video_format_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
+	video_format_entry.insert(0, "136")  # Default value for Video code
+
+	# Add the Empty V button
+	empty_v_button = tk.Button(video_audio_grid, text="Empty V", command=lambda: video_format_entry.delete(0, "end"))
+	empty_v_button.grid(row=0, column=2, padx=5, pady=5)
 
 	tk.Label(video_audio_grid, text="Audio code (e.g., 140 for m4a):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
 	audio_format_entry = tk.Entry(video_audio_grid)
 	audio_format_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
+	audio_format_entry.insert(0, "140")  # Default value for Audio code
 
+	# Add the Empty A button
+	empty_a_button = tk.Button(video_audio_grid, text="Empty A", command=lambda: audio_format_entry.delete(0, "end"))
+	empty_a_button.grid(row=1, column=2, padx=5, pady=5)
+
+	# Add the Download button
 	tk.Button(input_options_frame, text="Download", command=lambda: on_download()).grid(row=1, column=0, padx=5, pady=5, sticky="w")
+
+	# Add the Stop button
+	stop_button = tk.Button(input_options_frame, text="Stop", command=lambda: stop_download(stop_button, status_box))
+	stop_button.grid(row=1, column=1, padx=5, pady=5)
 
 	input_options_frame.grid_columnconfigure(1, weight=1)
 
@@ -157,11 +183,11 @@ def main():
 	formats_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
 	tk.Label(formats_frame, text="Available Video Formats:").pack(anchor="w", padx=5, pady=5)
-	video_formats_listbox = tk.Listbox(formats_frame, height=10)
+	video_formats_listbox = tk.Listbox(formats_frame, height=8)
 	video_formats_listbox.pack(fill="both", expand=True, padx=5, pady=5)
 
 	tk.Label(formats_frame, text="Available Audio Formats:").pack(anchor="w", padx=5, pady=5)
-	audio_formats_listbox = tk.Listbox(formats_frame, height=10)
+	audio_formats_listbox = tk.Listbox(formats_frame, height=8)
 	audio_formats_listbox.pack(fill="both", expand=True, padx=5, pady=5)
 
 	def on_fetch_formats(video_url):
@@ -197,7 +223,7 @@ def main():
 		status_box.config(state="disabled")
 
 		# Call the download function with the status box
-		download_video(url_entry.get(), video_format, audio_format, status_box)
+		download_video(url_entry.get(), video_format, audio_format, status_box, stop_button)
 
 	# When a video format is selected, fill the video code field
 	def on_video_format_select(event):
@@ -221,6 +247,7 @@ def main():
 	video_formats_listbox.bind("<<ListboxSelect>>", on_video_format_select)
 	audio_formats_listbox.bind("<<ListboxSelect>>", on_audio_format_select)
 
+	# Start the GUI loop
 	root.mainloop()
 
 if __name__ == "__main__":
