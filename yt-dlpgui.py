@@ -151,6 +151,10 @@ def main():
 	# Add the Empty V button
 	empty_v_button = tk.Button(video_audio_grid, text="Empty V", command=lambda: video_format_entry.delete(0, "end"))
 	empty_v_button.grid(row=0, column=2, padx=5, pady=5)
+	
+	# Add the Default V button
+	empty_v_button = tk.Button(video_audio_grid, text="Default V", command=lambda: video_format_entry.delete(0, "end") or video_format_entry.insert(0, "136"))
+	empty_v_button.grid(row=0, column=3, padx=5, pady=5)
 
 	tk.Label(video_audio_grid, text="Audio code (e.g., 140 for m4a):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
 	audio_format_entry = tk.Entry(video_audio_grid)
@@ -160,6 +164,10 @@ def main():
 	# Add the Empty A button
 	empty_a_button = tk.Button(video_audio_grid, text="Empty A", command=lambda: audio_format_entry.delete(0, "end"))
 	empty_a_button.grid(row=1, column=2, padx=5, pady=5)
+	
+	# Add the Default A button
+	empty_a_button = tk.Button(video_audio_grid, text="Default A", command=lambda: audio_format_entry.delete(0, "end") or audio_format_entry.insert(0, "140"))
+	empty_a_button.grid(row=1, column=3, padx=5, pady=5)
 
 	# Add the Download button
 	tk.Button(input_options_frame, text="Download", command=lambda: on_download()).grid(row=1, column=0, padx=5, pady=5, sticky="w")
