@@ -1,10 +1,11 @@
 import subprocess
 import tkinter as tk
+import vlc
 from tkinter import messagebox
 import threading
-
 import tkinter.filedialog as fd
 import os
+
 default_folder_path = os.getcwd()
 
 # Check if yt-dlp is installed
@@ -25,8 +26,39 @@ def fetch_formats(video_url):
 		messagebox.showerror("Error", f"Failed to fetch formats: {e.stderr}")
 		return None
 
+def create_media_player():
+	"""Create a media player window using VLC."""
+	global vlc_instance, media_player
+
+	# Create frame for the media player
+	video_frame = tk.Frame(root, bg="black", relief="solid", bd=2)
+	video_frame.grid(row=2, column=0, padx=10, pady=10, sticky="nsew")
+
+	# VLC player instance
+	vlc_instance = vlc.Instance()
+	media_player = vlc_instance.media_player_new()
+	media_player.set_hwnd(video_frame.winfo_id())  # Embed VLC into Tkinter Frame
+	media_player.set_media(vlc_instance.media_new(r"path_to_your_video.mp4"))  # Replace with your video path
+
+	# Add Play button
+	play_button = tk.Button(video_frame, text="Play", command=play_video)
+	play_button.pack(side="left", padx=5, pady=5)
+
+	pause_button = tk.Button(video_frame, text="Pause", command=pause_video)
+	pause_button.pack(side="left", padx=5, pady=5)
+
+
+def play_video():
+	"""Play video."""
+	media_player.play()
+
+
+def pause_video():
+	"""Pause video."""
+	media_player.pause()
+
 # Download the video with real-time progress
-def download_video(video_url, video_format, audio_format, status_box, stop_button):
+def download_video(video_url, video_format, audio_format, status_box, stop_button, cookie):
 	def download():
 		global default_folder_path  # Use the updated global folder path
 		try:
@@ -37,9 +69,12 @@ def download_video(video_url, video_format, audio_format, status_box, stop_butto
 
 			# Running yt-dlp with a custom progress handler using the --progress option
 			output_template = os.path.join(default_folder_path, "%(title)s.%(ext)s")  # Include folder path
+			# Add cookies parameter if enabled
+			cookies = ["--cookies-from-browser", "chrome", "--cookies", "cookies.txt"] if cookie else []
 			process = subprocess.Popen(
 				[
 					"yt-dlp",
+					*cookies,
 					"-f", f"{format_string}",
 					"-o", output_template,
 					"--progress",
@@ -69,6 +104,14 @@ def download_video(video_url, video_format, audio_format, status_box, stop_butto
 				status_box.config(state="normal")
 				status_box.insert("end", f"Download failed with exit code {process.returncode}\n")
 				status_box.config(state="disabled")
+			# Delete cookies.txt if it exists
+			if cookie:
+				try:
+					if os.path.exists("cookies.txt"):
+						os.remove("cookies.txt")
+						status_box.insert("end", "cookies.txt deleted successfully.\n")
+				except Exception as e:
+					status_box.insert("end", f"Error deleting cookies.txt: {str(e)}\n")
 
 		except Exception as e:
 			status_box.config(state="normal")
@@ -87,6 +130,34 @@ def stop_download(stop_button, status_box):
 		status_box.insert("end", "Download stopped.\n")
 		status_box.config(state="disabled")
 
+# Function to play the downloaded video
+def play_video():
+	try:
+		# Get the latest downloaded file from the default folder
+		global default_folder_path
+		files = [os.path.join(default_folder_path, f) for f in os.listdir(default_folder_path) if os.path.isfile(os.path.join(default_folder_path, f))]
+		if not files:
+			messagebox.showerror("Error", "No downloaded videos found in the selected folder.")
+			return
+
+		# Sort files by modification time (most recent file first)
+		latest_file = max(files, key=os.path.getmtime)
+
+		# Check if it's a video file
+		if not latest_file.lower().endswith(('.mp4', '.mkv', '.avi', '.webm', '.flv', '.mov')):
+			messagebox.showerror("Error", "The latest file is not a video format.")
+			return
+
+		# Open the video file with the default video player
+		if os.name == "nt":  # For Windows
+			os.startfile(latest_file)
+		elif os.name == "posix":  # For macOS/Linux
+			subprocess.run(["open" if sys.platform == "darwin" else "xdg-open", latest_file])
+		else:
+			messagebox.showerror("Error", "Unable to open the video file.")
+	except Exception as e:
+		messagebox.showerror("Error", f"An error occurred while trying to play the video: {str(e)}")
+
 # Main application
 def main():
 	if not check_yt_dlp():
@@ -94,7 +165,7 @@ def main():
 
 	# Default folder path
 	default_folder_path = os.path.expanduser("~/Downloads")
-	 
+
 	def browse_folder():
 		global default_folder_path  # Make it global
 		selected_folder = fd.askdirectory(initialdir=default_folder_path, title="Select Download Folder")
@@ -114,6 +185,14 @@ def main():
 		else:
 			print("Invalid folder path entered.")
 
+	def on_checkbox_toggle():
+		if checkbox_var.get():
+			print("With cookies!")
+			messagebox.showinfo("Cookies", "Download by using cookies from chrome!")
+		else:
+			print("Without cookies!")
+			messagebox.showinfo("Cookies", "Download without using cookies!")
+
 	root = tk.Tk()
 	root.title("YT-DLP Video Downloader")
 	root.geometry("800x600")  # Set an initial size
@@ -121,7 +200,7 @@ def main():
 
 	main_frame = tk.Frame(root)
 	main_frame.pack(fill="both", expand=True)
-	
+
 	# Parent Frame for URL and Folder
 	top_frame = tk.Frame(main_frame)
 	top_frame.pack(fill="x", padx=10, pady=5)
@@ -134,7 +213,12 @@ def main():
 	url_entry = tk.Entry(url_frame)
 	url_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
 	fetch_button = tk.Button(url_frame, text="Fetch Formats", command=lambda: on_fetch_formats(url_entry.get()))
+#	fetch_button = tk.Button(url_frame, text="Fetch Formats", command=create_media_player)
 	fetch_button.grid(row=0, column=2, padx=5, pady=5)
+
+	# Add another placeholder widget to demonstrate layout
+#	exit_button = tk.Button(url_frame, text="Exit", command=root.quit)
+#	exit_button.grid(row=0, column=1, padx=10, pady=10)
 
 	# Ensure URL entry expands
 	url_frame.grid_columnconfigure(1, weight=1)
@@ -180,7 +264,7 @@ def main():
 	def select_all_url():
 		url_entry.select_range(0, tk.END)
 		url_entry.icursor(tk.END)
-	
+
 	def show_context_menu(event):
 		"""Display the right-click context menu at the cursor's location."""
 		context_menu_fe.post(event.x_root, event.y_root)
@@ -230,7 +314,7 @@ def main():
 	root.bind("<Button-1>", hide_context_menu)  # Button-1 is the left mouse button
 
 	# Input Options Frame (Grid 1)
-	input_options_frame = tk.Frame(main_frame)
+	input_options_frame = tk.Frame(root, width=800, height=100)
 	input_options_frame.pack(fill="x", padx=10, pady=5)
 
 	video_audio_grid = tk.Frame(input_options_frame)
@@ -244,10 +328,10 @@ def main():
 	# Add the Empty V button
 	empty_v_button = tk.Button(video_audio_grid, text="Empty V", command=lambda: video_format_entry.delete(0, "end"))
 	empty_v_button.grid(row=0, column=2, padx=5, pady=5)
-	
+
 	# Add the Default V button
-	empty_v_button = tk.Button(video_audio_grid, text="Default V", command=lambda: video_format_entry.delete(0, "end") or video_format_entry.insert(0, "136"))
-	empty_v_button.grid(row=0, column=3, padx=5, pady=5)
+	def_v_button = tk.Button(video_audio_grid, text="Default V", command=lambda: video_format_entry.delete(0, "end") or video_format_entry.insert(0, "136"))
+	def_v_button.grid(row=0, column=3, padx=5, pady=5)
 
 	tk.Label(video_audio_grid, text="Audio code (e.g., 140 for m4a):").grid(row=1, column=0, sticky="w", padx=5, pady=5)
 	audio_format_entry = tk.Entry(video_audio_grid)
@@ -257,23 +341,41 @@ def main():
 	# Add the Empty A button
 	empty_a_button = tk.Button(video_audio_grid, text="Empty A", command=lambda: audio_format_entry.delete(0, "end"))
 	empty_a_button.grid(row=1, column=2, padx=5, pady=5)
-	
+
 	# Add the Default A button
-	empty_a_button = tk.Button(video_audio_grid, text="Default A", command=lambda: audio_format_entry.delete(0, "end") or audio_format_entry.insert(0, "140"))
-	empty_a_button.grid(row=1, column=3, padx=5, pady=5)
+	def_a_button = tk.Button(video_audio_grid, text="Default A", command=lambda: audio_format_entry.delete(0, "end") or audio_format_entry.insert(0, "140"))
+	def_a_button.grid(row=1, column=3, padx=5, pady=5)
 
 	# Add the Download button
-	tk.Button(input_options_frame, text="Download", command=lambda: on_download()).grid(row=1, column=0, padx=5, pady=5, sticky="w")
+	tk.Button(input_options_frame, text="Download", command=lambda: on_download()).grid(row=2, column=0, padx=5, pady=5, sticky="w")
 
 	# Add the Stop button
 	stop_button = tk.Button(input_options_frame, text="Stop", command=lambda: stop_download(stop_button, status_box))
-	stop_button.grid(row=1, column=1, padx=5, pady=5)
+	stop_button.grid(row=2, column=0, padx=150, pady=5, sticky="w")
 
-	input_options_frame.grid_columnconfigure(1, weight=1)
+	# Add the "Play" button in the input_options_frame
+#	print("Creating Play button...")
+#	play_button = tk.Button(input_options_frame, text="Play", command=play_video)
+#	play_button.grid(row=2, column=1, padx=10, pady=5)
+#	print("Play button created.")
+	tk.Label(input_options_frame, text="Cookies:").grid(row=2, column=0, padx=250, pady=5, sticky="w")
+	# Create a checkbox variable
+	checkbox_var = tk.BooleanVar()
+	# Add a checkbox
+	checkbox = tk.Checkbutton(
+		input_options_frame,
+		text="Yes",
+		variable=checkbox_var,
+		command=on_checkbox_toggle
+	)
+	checkbox.grid(row=2, column=0, padx=300, pady=5)
+
+	input_options_frame.grid_columnconfigure(0, weight=1)
+#	input_options_frame.grid_columnconfigure(2, weight=1)
 
 	# Download Status Frame (side by side with Video/Audio fields)
 	status_frame = tk.Frame(input_options_frame)
-	status_frame.grid(row=0, column=2, rowspan=2, padx=10, pady=5)
+	status_frame.grid(row=0, column=2, rowspan=4, padx=10, pady=5)
 
 	tk.Label(status_frame, text="Download Status:").pack(anchor="w", padx=5, pady=5)
 	status_box = tk.Text(status_frame, wrap="word", height=8, state="disabled")
@@ -313,6 +415,7 @@ def main():
 	def on_download():
 		video_format = video_format_entry.get()
 		audio_format = audio_format_entry.get()
+		cookie = checkbox_var.get()
 
 		if not video_format:
 			messagebox.showerror("Error", "Please enter a video format code.")
@@ -324,7 +427,7 @@ def main():
 		status_box.config(state="disabled")
 
 		# Call the download function with the status box
-		download_video(url_entry.get(), video_format, audio_format, status_box, stop_button)
+		download_video(url_entry.get(), video_format, audio_format, status_box, stop_button, cookie)
 
 	# When a video format is selected, fill the video code field
 	def on_video_format_select(event):
@@ -353,3 +456,4 @@ def main():
 
 if __name__ == "__main__":
 	main()
+
