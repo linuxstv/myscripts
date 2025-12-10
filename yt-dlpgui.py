@@ -76,6 +76,7 @@ def download_video(video_url, video_format, audio_format, status_box, stop_butto
 					"yt-dlp",
 					*cookies,
 					"-f", f"{format_string}",
+					"--merge-output-format", "mp4",
 					"-o", output_template,
 					"--progress",
 					video_url
